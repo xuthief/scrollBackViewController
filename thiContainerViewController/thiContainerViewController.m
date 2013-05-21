@@ -26,8 +26,8 @@
 @end
 
 @implementation thiContainerViewController {
-    UIViewController *_lastVC;
-    UIViewController *_curVC;
+    UIViewController *_lastVC, *_lastVcOnAppear, *_lastVcOnDisappear;
+    UIViewController *_curVC, *_curVcOnAppear, *_curVcOnDisappear;
     UIView *_curCoverView;
     NSMutableArray *_viewControllers;
     NSMutableArray *_coverViews;
@@ -68,26 +68,34 @@
 }
 
 - (void)viewWillAppear:(BOOL)animated {
-    [_curVC beginAppearanceTransition:YES animated:animated];
-    [_lastVC beginAppearanceTransition:YES animated:animated];
+    _curVcOnAppear = [_curVC retain];
+    _lastVcOnAppear = [_lastVC retain];
+    [_curVcOnAppear beginAppearanceTransition:YES animated:animated];
+    [_lastVcOnAppear beginAppearanceTransition:YES animated:animated];
 }
 
--(void) viewDidAppear:(BOOL)animated
+-(void)viewDidAppear:(BOOL)animated
 {
-    [_curVC endAppearanceTransition];
-    [_lastVC endAppearanceTransition];
+    [_curVcOnAppear endAppearanceTransition];
+    [_lastVcOnAppear endAppearanceTransition];
+    [_curVcOnAppear release];
+    [_lastVcOnAppear release];
 }
 
--(void) viewWillDisappear:(BOOL)animated
+-(void)viewWillDisappear:(BOOL)animated
 {
-    [_lastVC beginAppearanceTransition:NO animated:animated];
-    [_curVC beginAppearanceTransition:NO animated:animated];
+    _curVcOnDisappear = [_curVC retain];
+    _lastVcOnDisappear = [_lastVC retain];
+    [_lastVcOnDisappear beginAppearanceTransition:NO animated:animated];
+    [_curVcOnDisappear beginAppearanceTransition:NO animated:animated];
 }
 
 -(void) viewDidDisappear:(BOOL)animated
 {
-    [_lastVC endAppearanceTransition];
-    [_curVC endAppearanceTransition];
+    [_lastVcOnDisappear endAppearanceTransition];
+    [_curVcOnDisappear endAppearanceTransition];
+    [_curVcOnDisappear release];
+    [_lastVcOnDisappear release];
 }
 
 //do not forawrd appearance methods
@@ -97,7 +105,7 @@
 
 #pragma mark - push/pop scroll view controller
 - (void)pushScrollViewController:(UIViewController*)vc animated:(BOOL)animated scrollEnabled:(BOOL)scrollEnabled {
-    if (!self.view) {
+    if (!self.view || !vc.view) {
         return;
     }
     UIScrollView *scrollView = [[UIScrollView alloc] initWithFrame:MAIN_SCREEN_BOUNDS];
@@ -110,18 +118,25 @@
     scrollView.decelerationRate = UIScrollViewDecelerationRateFast;
     scrollView.scrollEnabled = scrollEnabled;
     
-    vc.view.frame = CGRectMake(MAIN_SCREEN_BOUNDS.size.width, 0, MAIN_SCREEN_BOUNDS.size.width, MAIN_APP_FRAME.size.height);
     //set shadown for vc view
+    vc.view.frame = CGRectMake(MAIN_SCREEN_BOUNDS.size.width, 0, MAIN_SCREEN_BOUNDS.size.width, MAIN_APP_FRAME.size.height);
+    
+    CALayer *shadowLayer = [[CALayer alloc] init];
+    shadowLayer.frame = vc.view.frame;
     CGPathRef shadowPath = CGPathCreateWithRect(vc.view.bounds, nil);
-    vc.view.layer.shadowPath = shadowPath;
+    shadowLayer.shadowPath = shadowPath;
     CGPathRelease(shadowPath);
-    vc.view.layer.shadowOffset = CGSizeMake(-4.f, 0);
-    vc.view.layer.shadowRadius = 5.f;
-    vc.view.layer.shadowOpacity = .35f;
-    vc.view.clipsToBounds = NO;
+    shadowLayer.shadowOffset = CGSizeMake(-4.f, 0);
+    shadowLayer.shadowRadius = 5.f;
+    shadowLayer.shadowOpacity = .35f;
+    [scrollView.layer insertSublayer:shadowLayer atIndex:-1];
+    [shadowLayer release];
+
+    //vc.view.clipsToBounds = NO;
     
     vc.view.layer.anchorPoint = CGPointMake(.5f*MAIN_APP_FRAME.size.height/MAIN_SCREEN_BOUNDS.size.width, .5f);
     vc.view.layer.position = CGPointMake(MAIN_SCREEN_BOUNDS.size.width+ .5f*MAIN_APP_FRAME.size.height, .5f*MAIN_APP_FRAME.size.height);
+    vc.view.layer.cornerRadius = 5.f;
     
     //cover view
     _curCoverView = [[UIView alloc] initWithFrame:MAIN_SCREEN_BOUNDS];
